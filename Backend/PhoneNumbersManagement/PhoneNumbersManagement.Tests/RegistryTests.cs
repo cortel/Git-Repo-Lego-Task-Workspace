@@ -10,6 +10,38 @@ public sealed class RegistryTests
     internal static RangeInput Input(string start = "+4512345600", string end = "+4512345602") =>
         new() { Name = "Aarhus", RangeStart = start, RangeEnd = end, Active = true, Provider = "Provider", Type = RangeType.DirectRouting, VoiceRoute = "sbc.example", NetboxSiteId = "site-1" };
 
+    [Fact]
+    public async Task RangeUpdatePersistsMappedMetadataAndRejectsBoundaryChanges()
+    {
+        using var test = new TestDatabase();
+        var original = Input();
+        var range = await test.Service.CreateRangeAsync(original, default);
+        var updated = original with
+        {
+            Name = "Updated range",
+            Description = "Updated description",
+            MainLine = original.RangeStart,
+            Active = false,
+            Provider = "Updated provider",
+            Type = RangeType.OperatorConnect,
+            VoiceRoute = null,
+            NetboxSiteId = "site-2"
+        };
+        await test.Service.UpdateRangeAsync(range.Id, updated, default);
+        var persisted = await test.Service.RangeAsync(range.Id, default);
+        Assert.Equal(updated, persisted.ToInput());
+        Assert.NotEqual(range.Version, persisted.Version);
+        Assert.Equal(3, await test.Db.PhoneNumbers.CountAsync());
+
+        await Assert.ThrowsAsync<Conflict>(() => test.Service.UpdateRangeAsync(range.Id, updated with
+        {
+            Name = "Must not persist",
+            RangeEnd = "+4512345603"
+        }, default));
+        Assert.Equal(updated, (await test.Service.RangeAsync(range.Id, default)).ToInput());
+        Assert.Equal(3, await test.Db.PhoneNumbers.CountAsync());
+    }
+
     [Theory]
     [InlineData("4512345678")]
     [InlineData("+012345")]
