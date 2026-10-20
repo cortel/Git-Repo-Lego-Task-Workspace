@@ -1,0 +1,15 @@
+/* Preserve Swagger's familiar method colors and improve separation between operations. */
+.swagger-ui .topbar { display: none; }
+.swagger-ui .wrapper { max-width: 1280px; padding: 0 24px; }
+.swagger-ui .info { margin: 32px 0 24px; }
+.swagger-ui .opblock-tag-section { margin-bottom: 32px; }
+.swagger-ui .opblock { margin-bottom: 16px; border-radius: 6px; }
+.swagger-ui .opblock .opblock-summary { padding: 12px; gap: 10px; }
+.swagger-ui .opblock .opblock-summary-method { min-width: 86px; }
+.swagger-ui .opblock-body { padding: 8px 12px 16px; }
+.swagger-ui .opblock-description-wrapper { padding: 16px 12px; }
+@media (max-width: 640px) {
+    .swagger-ui .wrapper { padding: 0 12px; }
+    .swagger-ui .opblock .opblock-summary { flex-wrap: wrap; gap: 6px; }
+    .swagger-ui .opblock .opblock-summary-path { max-width: 100%; overflow-wrap: anywhere; }
+}

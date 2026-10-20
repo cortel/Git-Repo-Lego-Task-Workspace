@@ -107,7 +107,7 @@ Entity routes use `/{id}` for GET, PUT, PATCH and DELETE. Collection GETs suppor
 
 JSON enums use names, not integer values. PATCH accepts known camelCase input fields, changes only fields present in the JSON, and allows explicit null for nullable values. Unknown fields and invalid values fail. Null required fields fail validation. Immutable values may be supplied unchanged.
 
-OpenAPI 3.1 is served at `/openapi/v1.json`, with bearer security definitions and policy/role descriptions. It is publicly readable; all business endpoints require authenticated Entra tokens and applicable app roles. No Hangfire dashboard is exposed.
+OpenAPI 3.1 is served at `/openapi/v1.json`, with bearer security definitions and policy/role descriptions. It is publicly readable; all business endpoints require authenticated Entra tokens and applicable app roles. In Development, Swagger UI at `/swagger` renders this same OpenAPI document with grouped, colored, expandable operations and an Authorize button. It adds no second schema generator and does not bypass endpoint authentication. The UI is not enabled in Production. No Hangfire dashboard is exposed.
 
 ## Teams integration
 
@@ -140,3 +140,11 @@ The local tests use SQLite relational constraints plus deterministic clocks and 
 PostgreSQL migrations and serializable transactions must also be verified against an isolated PostgreSQL database. Live Entra JWT issuance, Graph permissions and Teams semantics, and Hangfire storage startup require an integration environment; passing local tests does not certify those external services.
 
 Sources: [Npgsql EF Core 10](https://www.npgsql.org/efcore/release-notes/10.0.html), [Graph number assignments](https://learn.microsoft.com/en-us/graph/api/teamsadministration-telephonenumbermanagementroot-list-numberassignments?view=graph-rest-1.0), [ASP.NET OpenAPI customization](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/openapi/customize-openapi?view=aspnetcore-10.0).
+
+## Why migrations live in Infrastructure
+
+EF Core migrations describe changes to a particular database schema. They depend on RegistryDbContext, the EF mappings, and the PostgreSQL provider, so they are infrastructure concerns. Domain contains business rules and has no EF dependency. Application orchestrates use cases through IRegistryStore and has no database dependency.
+
+At runtime: Controller -> RegistryService (Application) -> IRegistryStore -> EfRegistryStore (Infrastructure) -> RegistryDbContext -> PostgreSQL. The service also invokes methods on Domain entities to enforce invariants. ASP.NET dependency injection wires the interface to its implementation; Application never needs to reference Infrastructure.
+
+A separate Persistence project is a valid refinement if database adapters grow, several providers are supported, or a team needs a distinct ownership boundary. It would contain the context, mappings, store, and migrations together, with Infrastructure retaining Graph and job adapters. Alternatively, a dedicated Migrations project can reference the context's project, but requires configuring the migrations assembly and deployment tooling. Neither split is necessary for the current size. A separate migration executable/deployment step can be used without changing Domain or Application.

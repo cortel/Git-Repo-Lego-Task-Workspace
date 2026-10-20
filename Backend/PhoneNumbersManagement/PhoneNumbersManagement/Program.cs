@@ -66,6 +66,22 @@ builder.Services.AddOpenApi(options =>
 var app = builder.Build();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
+if (app.Environment.IsDevelopment())
+{
+    app.UseStaticFiles();
+    app.UseSwaggerUI(options =>
+    {
+        options.RoutePrefix = "swagger";
+        options.SwaggerEndpoint("../openapi/v1.json", "Phone Number Registry v1");
+        options.DocumentTitle = "Phone Number Registry API";
+        options.EnableFilter();
+        options.DisplayRequestDuration();
+        options.DefaultModelsExpandDepth(-1);
+        options.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.List);
+        options.InjectStylesheet("./registry.css");
+        // Keep tokens in memory only; do not persist authorization in browser storage.
+    });
+}
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

@@ -41,7 +41,7 @@ dotnet ef migrations script --idempotent --project Backend/PhoneNumbersManagemen
 dotnet run --project Backend/PhoneNumbersManagement/PhoneNumbersManagement --launch-profile https
 ```
 
-Read the OpenAPI 3.1 document at `https://localhost:7185/openapi/v1.json`. Use the checked-in `.http` examples with a real Entra access token containing app roles. There is no bundled Swagger UI. All business endpoints require authentication.
+Read the OpenAPI 3.1 document at `https://localhost:7185/openapi/v1.json`. Use the checked-in `.http` examples with a real Entra access token containing app roles. In Development, Swagger UI is available at `https://localhost:7185/swagger` and opens automatically when launching the API from Visual Studio. It groups endpoints by controller, uses standard colored method labels, supports filtering and expandable requests, and provides an Authorize button for an Entra bearer token. Tokens are not persisted in browser storage. GET is blue and POST is green in the standard Swagger palette. The UI and its custom stylesheet are served only in Development. All business endpoints require authentication.
 
 ## Run background jobs
 
