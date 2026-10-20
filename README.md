@@ -2,6 +2,8 @@
 
 .NET 10 backend for ranges, phone numbers, reservations, and scheduled Teams reconciliation. Start with [the architecture, schema, lifecycle, and decisions](docs/architecture.md).
 
+For release risks, requirement traceability, architecture decisions, acceptance tests and delivery gates, read the [production architecture review](docs/production-architecture-review.md).
+
 ## Solution
 
 Open `Backend/PhoneNumbersManagement/PhoneNumbersManagement.slnx` in Visual Studio 2026. The existing PhoneNumbersManagement project is the API. Domain and Application have no ASP.NET, EF Core, or Hangfire dependencies. Infrastructure supplies adapters; Worker is a separate executable. Tests exercise business rules and HTTP behavior.
