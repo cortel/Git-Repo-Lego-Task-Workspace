@@ -110,3 +110,21 @@ dotnet format analyzers Backend/PhoneNumbersManagement/PhoneNumbersManagement.sl
 ```
 
 Use the same commands with `--verify-no-changes` to check formatting without modifying source. Layout rules are preferences for this repository, not universal requirements of C# or DDD.
+
+## Named inputs and efficient reads
+
+Inputs use named record properties, and entity construction uses domain parameter objects. For example:
+
+```csharp
+var input = new RangeInput
+{
+    Name = "Aarhus",
+    RangeStart = "+4512345600",
+    RangeEnd = "+4512345602",
+    Active = true,
+    Provider = "Example provider",
+    Type = RangeType.DirectRouting
+};
+```
+
+The application maps this to NumberRangeDefinition; Domain never references the API input DTO. API read results are explicit response DTOs projected by EF, and synchronization avoids repeated lookups and unchanged write transactions. See [efficiency changes, measured work counts and limitations](docs/efficiency-and-contracts.md). JSON fields remain compatible, but OpenAPI response component names have changed to the DTO names.

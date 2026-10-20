@@ -10,13 +10,13 @@ namespace PhoneNumbersManagement.Controllers;
 public sealed class ReservationsController(RegistryService service) : ControllerBase
 {
     [HttpGet, Authorize(Policy = "read")]
-    public Task<Page<Reservation>> GetAll([FromQuery] ReservationQuery query, CancellationToken ct) => service.ReservationsAsync(query, ct);
+    public Task<Page<ReservationResponse>> GetAll([FromQuery] ReservationQuery query, CancellationToken ct) => service.ReservationsAsync(query, ct);
 
     [HttpGet("{id:guid}"), Authorize(Policy = "read")]
-    public Task<Reservation> GetById(Guid id, CancellationToken ct) => service.ReservationAsync(id, ct);
+    public Task<ReservationResponse> GetById(Guid id, CancellationToken ct) => service.ReservationAsync(id, ct);
 
     [HttpPost, Authorize(Policy = "write")]
-    public async Task<ActionResult<Reservation>> Create(ReservationInput input, CancellationToken ct)
+    public async Task<ActionResult<ReservationResponse>> Create(ReservationInput input, CancellationToken ct)
     {
         var reservation = await service.CreateReservationAsync(input, ct);
         return CreatedAtAction(nameof(GetById), new
@@ -26,14 +26,13 @@ public sealed class ReservationsController(RegistryService service) : Controller
     }
 
     [HttpPut("{id:guid}"), Authorize(Policy = "write")]
-    public Task<Reservation> Update(Guid id, ReservationInput input, CancellationToken ct) => service.UpdateReservationAsync(id, input, ct);
+    public Task<ReservationResponse> Update(Guid id, ReservationInput input, CancellationToken ct) => service.UpdateReservationAsync(id, input, ct);
 
     [HttpPatch("{id:guid}"), Authorize(Policy = "write")]
-    public async Task<Reservation> Patch(Guid id, JsonElement patch, CancellationToken ct)
+    public async Task<ReservationResponse> Patch(Guid id, JsonElement patch, CancellationToken ct)
     {
         var r = await service.ReservationAsync(id, ct);
-        return await service.UpdateReservationAsync(id, MergePatch.Apply(new ReservationInput(r.ReservedFor,
-            r.Reason, r.PhoneNumberId, r.System, r.Expires, r.TicketNumber), patch), ct, r.Version);
+        return await service.UpdateReservationAsync(id, MergePatch.Apply(r.ToInput(), patch), ct, r.Version);
     }
 
     [HttpDelete("{id:guid}"), Authorize(Policy = "admin")]

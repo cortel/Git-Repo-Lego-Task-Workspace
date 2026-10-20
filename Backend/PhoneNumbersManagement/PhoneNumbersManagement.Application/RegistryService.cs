@@ -4,67 +4,61 @@ namespace PhoneNumbersManagement.Application;
 
 public sealed class RegistryService(IRegistryStore store, TimeProvider clock)
 {
-    public Task<Page<NumberRange>> RangesAsync(RangeQuery q, CancellationToken ct)
+    public Task<Page<RangeResponse>> RangesAsync(RangeQuery q, CancellationToken ct)
     {
         ValidatePage(q.Offset, q.Limit);
         return store.RangesAsync(q, ct);
     }
 
-    public Task<Page<PhoneNumber>> PhonesAsync(PhoneQuery q, CancellationToken ct)
+    public Task<Page<PhoneResponse>> PhonesAsync(PhoneQuery q, CancellationToken ct)
     {
         ValidatePage(q.Offset, q.Limit);
         return store.PhonesAsync(q, ct);
     }
 
-    public Task<Page<Reservation>> ReservationsAsync(ReservationQuery q, CancellationToken ct)
+    public Task<Page<ReservationResponse>> ReservationsAsync(ReservationQuery q, CancellationToken ct)
     {
         ValidatePage(q.Offset, q.Limit);
         return store.ReservationsAsync(q, ct);
     }
 
-    public async Task<NumberRange> RangeAsync(Guid id, CancellationToken ct) => await store.FindRangeAsync(id, ct) ?? throw new EntityNotFound("Range");
+    public async Task<RangeResponse> RangeAsync(Guid id, CancellationToken ct) => await store.ReadRangeAsync(id, ct) ?? throw new EntityNotFound("Range");
 
-    public async Task<PhoneNumber> PhoneAsync(Guid id, CancellationToken ct) => await store.FindPhoneAsync(id, ct) ?? throw new EntityNotFound("Phone number");
+    public async Task<PhoneResponse> PhoneAsync(Guid id, CancellationToken ct) => await store.ReadPhoneAsync(id, ct) ?? throw new EntityNotFound("Phone number");
 
-    public async Task<Reservation> ReservationAsync(Guid id, CancellationToken ct) => await store.FindReservationAsync(id, ct) ?? throw new EntityNotFound("Reservation");
+    public async Task<ReservationResponse> ReservationAsync(Guid id, CancellationToken ct) => await store.ReadReservationAsync(id, ct) ?? throw new EntityNotFound("Reservation");
 
-    public Task<NumberRange> CreateRangeAsync(RangeInput input, CancellationToken ct) => store.WriteAsync(async token =>
+    public Task<RangeResponse> CreateRangeAsync(RangeInput input, CancellationToken ct) => store.WriteAsync(async token =>
     {
-        var range = new NumberRange(input.Name, input.Description, input.RangeStart, input.RangeEnd,
-            input.MainLine, input.Active, input.Provider, input.Type, input.VoiceRoute, input.NetboxSiteId);
+        var range = new NumberRange(input.ToDefinition());
         if (await store.OverlapsAsync(range.RangeStart, range.RangeEnd, token))
         {
             throw new Conflict("The range overlaps an existing range.");
         }
 
         store.Add(range, range.CreateNumbers());
-        return range;
+        return RangeResponse.FromEntity(range);
     }, ct);
 
-    public Task<NumberRange> UpdateRangeAsync(Guid id, RangeInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
+    public Task<RangeResponse> UpdateRangeAsync(Guid id, RangeInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
     {
-        var range = await RangeAsync(id, token);
+        var range = await store.FindRangeAsync(id, token) ?? throw new EntityNotFound("Range");
         if (expectedVersion is not null && range.Version != expectedVersion)
         {
             throw new Conflict("Record changed during PATCH. Reload and retry.");
         }
 
-        if (range.RangeStart != input.RangeStart || range.RangeEnd != input.RangeEnd)
-        {
-            throw new Conflict("Range boundaries are immutable. Create a replacement range through an agreed migration.");
-        }
-
-        range.Update(input.Name, input.Description, input.MainLine, input.Active, input.Provider, input.Type, input.VoiceRoute, input.NetboxSiteId);
-        return range;
+        range.Update(input.ToDefinition());
+        return RangeResponse.FromEntity(range);
     }, ct);
 
     public Task<bool> DeleteRangeAsync(Guid id, CancellationToken ct) => store.WriteAsync(async token =>
     {
-        store.Remove(await RangeAsync(id, token));
+        store.Remove(await store.FindRangeAsync(id, token) ?? throw new EntityNotFound("Range"));
         return true;
     }, ct);
 
-    public async Task<IReadOnlyList<PhoneNumber>> NextAvailableAsync(Guid rangeId, int amount, CancellationToken ct)
+    public async Task<IReadOnlyList<PhoneResponse>> NextAvailableAsync(Guid rangeId, int amount, CancellationToken ct)
     {
         if (amount is < 1 or > 1000)
         {
@@ -79,9 +73,9 @@ public sealed class RegistryService(IRegistryStore store, TimeProvider clock)
         return await store.AvailableAsync(rangeId, amount, ct);
     }
 
-    public Task<PhoneNumber> UpdatePhoneAsync(Guid id, PhoneInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
+    public Task<PhoneResponse> UpdatePhoneAsync(Guid id, PhoneInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
     {
-        var phone = await PhoneAsync(id, token);
+        var phone = await store.FindPhoneAsync(id, token) ?? throw new EntityNotFound("Phone number");
         if (expectedVersion is not null && phone.Version != expectedVersion)
         {
             throw new Conflict("Record changed during PATCH. Reload and retry.");
@@ -93,12 +87,12 @@ public sealed class RegistryService(IRegistryStore store, TimeProvider clock)
         }
 
         phone.Update(input.AssignedUser, input.Status, input.ScheduledUnassignment, await store.ReservationForPhoneAsync(id, token) is not null);
-        return phone;
+        return PhoneResponse.FromEntity(phone);
     }, ct);
 
-    public Task<Reservation> CreateReservationAsync(ReservationInput input, CancellationToken ct) => store.WriteAsync(async token =>
+    public Task<ReservationResponse> CreateReservationAsync(ReservationInput input, CancellationToken ct) => store.WriteAsync(async token =>
     {
-        var phone = await PhoneAsync(input.PhoneNumberId, token);
+        var phone = await store.FindPhoneAsync(input.PhoneNumberId, token) ?? throw new EntityNotFound("Phone number");
         if (!(await RangeAsync(phone.RangeId, token)).Active)
         {
             throw new Conflict("Range is inactive.");
@@ -109,15 +103,15 @@ public sealed class RegistryService(IRegistryStore store, TimeProvider clock)
             throw new Conflict("Phone number is already reserved.");
         }
 
-        var reservation = new Reservation(phone.Id, input.ReservedFor, input.Reason, input.System, input.Expires, input.TicketNumber, clock.GetUtcNow());
+        var reservation = new Reservation(phone.Id, input.ToDetails(), clock.GetUtcNow());
         phone.Reserve();
         store.Add(reservation);
-        return reservation;
+        return ReservationResponse.FromEntity(reservation);
     }, ct);
 
-    public Task<Reservation> UpdateReservationAsync(Guid id, ReservationInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
+    public Task<ReservationResponse> UpdateReservationAsync(Guid id, ReservationInput input, CancellationToken ct, Guid? expectedVersion = null) => store.WriteAsync(async token =>
     {
-        var reservation = await ReservationAsync(id, token);
+        var reservation = await store.FindReservationAsync(id, token) ?? throw new EntityNotFound("Reservation");
         if (expectedVersion is not null && reservation.Version != expectedVersion)
         {
             throw new Conflict("Record changed during PATCH. Reload and retry.");
@@ -133,19 +127,19 @@ public sealed class RegistryService(IRegistryStore store, TimeProvider clock)
             throw new Conflict("Reservation cannot be moved to another phone number.");
         }
 
-        reservation.Update(input.ReservedFor, input.Reason, input.System, input.Expires, input.TicketNumber, clock.GetUtcNow());
-        return reservation;
+        reservation.Update(input.ToDetails(), clock.GetUtcNow());
+        return ReservationResponse.FromEntity(reservation);
     }, ct);
 
     public Task<bool> DeleteReservationAsync(Guid id, CancellationToken ct) => store.WriteAsync(async token =>
     {
-        var reservation = await ReservationAsync(id, token);
+        var reservation = await store.FindReservationAsync(id, token) ?? throw new EntityNotFound("Reservation");
         if (reservation.Kind == ReservationKind.Offboarding)
         {
             throw new Conflict("Offboarding holds are managed by the synchronization job.");
         }
 
-        (await PhoneAsync(reservation.PhoneNumberId, token)).ReservationEnded();
+        (await store.FindPhoneAsync(reservation.PhoneNumberId, token) ?? throw new EntityNotFound("Phone number")).ReservationEnded();
         store.Remove(reservation);
         return true;
     }, ct);

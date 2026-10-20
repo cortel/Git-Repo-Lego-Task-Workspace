@@ -17,6 +17,8 @@ internal sealed class TestDatabase : IDisposable
 
     public MutableClock Clock { get; } = new();
 
+    public DatabaseWorkCounter Work { get; } = new();
+
     public RegistryService Service
     {
         get;
@@ -25,7 +27,7 @@ internal sealed class TestDatabase : IDisposable
     public TestDatabase()
     {
         Connection.Open();
-        Db = new(CreateOptions(Connection));
+        Db = new(new DbContextOptionsBuilder<RegistryDbContext>(CreateOptions(Connection)).AddInterceptors(Work).Options);
         Db.Database.EnsureCreated();
         Service = new(new EfRegistryStore(Db), Clock);
     }
@@ -71,9 +73,14 @@ internal sealed class FakeTeams : ITeamsDirectory
 
     public bool Fail { get; set; }
 
+    public List<Guid> UserLookups { get; } = [];
+
     public Task<IReadOnlyList<TeamsAssignment>> GetAssignmentsAsync(CancellationToken ct) =>
         Fail ? throw new HttpRequestException("Simulated unavailable Graph") : Task.FromResult(Assignments);
 
-    public Task<DirectoryUserState> GetUserStateAsync(Guid userId, CancellationToken ct) =>
-        Fail ? throw new HttpRequestException("Simulated unavailable Graph") : Task.FromResult(State);
+    public Task<DirectoryUserState> GetUserStateAsync(Guid userId, CancellationToken ct)
+    {
+        UserLookups.Add(userId);
+        return Fail ? throw new HttpRequestException("Simulated unavailable Graph") : Task.FromResult(State);
+    }
 }

@@ -14,19 +14,29 @@ public interface IRegistryStore
 
     Task<Reservation?> ReservationForPhoneAsync(Guid id, CancellationToken ct);
 
-    Task<Page<NumberRange>> RangesAsync(RangeQuery query, CancellationToken ct);
+    Task<Page<RangeResponse>> RangesAsync(RangeQuery query, CancellationToken ct);
 
-    Task<Page<PhoneNumber>> PhonesAsync(PhoneQuery query, CancellationToken ct);
+    Task<Page<PhoneResponse>> PhonesAsync(PhoneQuery query, CancellationToken ct);
 
-    Task<Page<Reservation>> ReservationsAsync(ReservationQuery query, CancellationToken ct);
+    Task<Page<ReservationResponse>> ReservationsAsync(ReservationQuery query, CancellationToken ct);
 
-    Task<IReadOnlyList<PhoneNumber>> AvailableAsync(Guid rangeId, int amount, CancellationToken ct);
+    Task<IReadOnlyList<PhoneResponse>> AvailableAsync(Guid rangeId, int amount, CancellationToken ct);
 
     Task<bool> OverlapsAsync(string start, string end, CancellationToken ct);
 
     Task<IReadOnlyList<Reservation>> ExpiredAsync(DateTimeOffset now, int limit, CancellationToken ct);
 
     Task<PhoneNumber?> FindPhoneByNumberAsync(string number, CancellationToken ct);
+
+    Task<RangeResponse?> ReadRangeAsync(Guid id, CancellationToken ct);
+
+    Task<PhoneResponse?> ReadPhoneAsync(Guid id, CancellationToken ct);
+
+    Task<ReservationResponse?> ReadReservationAsync(Guid id, CancellationToken ct);
+
+    Task<IReadOnlyDictionary<string, PhoneSyncState>> ManagedPhonesAsync(string[] numbers, CancellationToken ct);
+
+    Task<IReadOnlyList<AssignedPhone>> AssignedPhonesAfterAsync(long afterNumber, int limit, CancellationToken ct);
 
     void Add(NumberRange range, IEnumerable<PhoneNumber> numbers);
 

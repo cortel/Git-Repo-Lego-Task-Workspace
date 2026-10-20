@@ -24,37 +24,36 @@ public sealed class Reservation
     {
     }
 
-    public Reservation(Guid phoneNumberId, string reservedFor, string? reason, ReservationSystem system,
-        DateTimeOffset? expires, string? ticket, DateTimeOffset now, ReservationKind kind = ReservationKind.Standard)
+    public Reservation(Guid phoneNumberId, ReservationDetails details, DateTimeOffset now,
+        ReservationKind kind = ReservationKind.Standard)
     {
         PhoneNumberId = phoneNumberId;
         Kind = kind;
-        Update(reservedFor, reason, system, expires, ticket, now);
+        Update(details, now);
     }
 
-    public void Update(string reservedFor, string? reason, ReservationSystem system, DateTimeOffset? expires,
-        string? ticket, DateTimeOffset now)
+    public void Update(ReservationDetails details, DateTimeOffset now)
     {
-        if (reservedFor is not ("user" or "system" or "external"))
+        if (details.ReservedFor is not ("user" or "system" or "external"))
         {
             throw new RuleViolation("ReservedFor must be user, system, or external; never a name or email.");
         }
 
-        if (!Enum.IsDefined(system) || reason?.Length > 2000 || ticket?.Length > 200)
+        if (!Enum.IsDefined(details.System) || details.Reason?.Length > 2000 || details.TicketNumber?.Length > 200)
         {
             throw new RuleViolation("Invalid reservation system or field length.");
         }
 
-        if (expires is not null && (expires <= now || expires.Value.Offset != TimeSpan.Zero))
+        if (details.Expires is { } expires && (expires <= now || expires.Offset != TimeSpan.Zero))
         {
             throw new RuleViolation("Expiry must be a future UTC timestamp, or null for no expiry.");
         }
 
-        ReservedFor = reservedFor;
-        Reason = reason;
-        System = system;
-        Expires = expires;
-        TicketNumber = ticket;
+        ReservedFor = details.ReservedFor;
+        Reason = details.Reason;
+        System = details.System;
+        Expires = details.Expires;
+        TicketNumber = details.TicketNumber;
         Version = Guid.NewGuid();
     }
 }

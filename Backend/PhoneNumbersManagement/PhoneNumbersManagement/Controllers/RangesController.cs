@@ -10,13 +10,13 @@ namespace PhoneNumbersManagement.Controllers;
 public sealed class RangesController(RegistryService service) : ControllerBase
 {
     [HttpGet, Authorize(Policy = "read")]
-    public Task<Page<NumberRange>> GetAll([FromQuery] RangeQuery query, CancellationToken ct) => service.RangesAsync(query, ct);
+    public Task<Page<RangeResponse>> GetAll([FromQuery] RangeQuery query, CancellationToken ct) => service.RangesAsync(query, ct);
 
     [HttpGet("{id:guid}"), Authorize(Policy = "read")]
-    public Task<NumberRange> GetById(Guid id, CancellationToken ct) => service.RangeAsync(id, ct);
+    public Task<RangeResponse> GetById(Guid id, CancellationToken ct) => service.RangeAsync(id, ct);
 
     [HttpPost, Authorize(Policy = "admin")]
-    public async Task<ActionResult<NumberRange>> Create(RangeInput input, CancellationToken ct)
+    public async Task<ActionResult<RangeResponse>> Create(RangeInput input, CancellationToken ct)
     {
         var range = await service.CreateRangeAsync(input, ct);
         return CreatedAtAction(nameof(GetById), new
@@ -26,14 +26,13 @@ public sealed class RangesController(RegistryService service) : ControllerBase
     }
 
     [HttpPut("{id:guid}"), Authorize(Policy = "admin")]
-    public Task<NumberRange> Update(Guid id, RangeInput input, CancellationToken ct) => service.UpdateRangeAsync(id, input, ct);
+    public Task<RangeResponse> Update(Guid id, RangeInput input, CancellationToken ct) => service.UpdateRangeAsync(id, input, ct);
 
     [HttpPatch("{id:guid}"), Authorize(Policy = "admin")]
-    public async Task<NumberRange> Patch(Guid id, JsonElement patch, CancellationToken ct)
+    public async Task<RangeResponse> Patch(Guid id, JsonElement patch, CancellationToken ct)
     {
         var range = await service.RangeAsync(id, ct);
-        var input = new RangeInput(range.Name, range.Description, range.RangeStart, range.RangeEnd, range.MainLine,
-            range.Active, range.Provider, range.Type, range.VoiceRoute, range.NetboxSiteId);
+        var input = range.ToInput();
         return await service.UpdateRangeAsync(id, MergePatch.Apply(input, patch), ct, range.Version);
     }
 

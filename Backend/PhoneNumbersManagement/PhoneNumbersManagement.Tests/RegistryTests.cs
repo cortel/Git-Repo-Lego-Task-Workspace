@@ -8,7 +8,7 @@ namespace PhoneNumbersManagement.Tests;
 public sealed class RegistryTests
 {
     internal static RangeInput Input(string start = "+4512345600", string end = "+4512345602") =>
-        new("Aarhus", null, start, end, null, true, "Provider", RangeType.DirectRouting, "sbc.example", "site-1");
+        new() { Name = "Aarhus", RangeStart = start, RangeEnd = end, Active = true, Provider = "Provider", Type = RangeType.DirectRouting, VoiceRoute = "sbc.example", NetboxSiteId = "site-1" };
 
     [Theory]
     [InlineData("4512345678")]
@@ -24,7 +24,7 @@ public sealed class RegistryTests
         var range = await test.Service.CreateRangeAsync(Input(), default);
         var numbers = await test.Service.NextAvailableAsync(range.Id, 10, default);
         Assert.Equal(new[] { "+4512345600", "+4512345601", "+4512345602" }, numbers.Select(x => x.LineUri));
-        await test.Service.CreateReservationAsync(new("system", null, numbers[0].Id, ReservationSystem.Other, null, null), default);
+        await test.Service.CreateReservationAsync(new() { ReservedFor = "system", PhoneNumberId = numbers[0].Id, System = ReservationSystem.Other }, default);
 
         // Clear tracking so this verifies database cascading, rather than EF's in-memory relationship fixup.
         test.Db.ChangeTracker.Clear();
@@ -39,7 +39,7 @@ public sealed class RegistryTests
         using var test = new TestDatabase();
         var range = await test.Service.CreateRangeAsync(Input(), default);
         var phone = (await test.Service.NextAvailableAsync(range.Id, 1, default))[0];
-        var input = new ReservationInput("user", null, phone.Id, ReservationSystem.MicrosoftTeams, null, "TASK-1");
+        var input = new ReservationInput { ReservedFor = "user", PhoneNumberId = phone.Id, System = ReservationSystem.MicrosoftTeams, TicketNumber = "TASK-1" };
         var first = await test.Service.CreateReservationAsync(input, default);
         await Assert.ThrowsAsync<Conflict>(() => test.Service.CreateReservationAsync(input, default));
         Assert.Single(await test.Db.Reservations.ToListAsync());
@@ -66,7 +66,7 @@ public sealed class RegistryTests
             Active = false
         }, default);
         var phone = await test.Db.PhoneNumbers.FirstAsync();
-        await Assert.ThrowsAsync<Conflict>(() => test.Service.CreateReservationAsync(new("system", null, phone.Id, ReservationSystem.Other, null, null), default));
+        await Assert.ThrowsAsync<Conflict>(() => test.Service.CreateReservationAsync(new() { ReservedFor = "system", PhoneNumberId = phone.Id, System = ReservationSystem.Other }, default));
     }
 
     [Fact]
@@ -75,8 +75,8 @@ public sealed class RegistryTests
         using var test = new TestDatabase();
         var range = await test.Service.CreateRangeAsync(Input(), default);
         var phones = await test.Service.NextAvailableAsync(range.Id, 2, default);
-        await test.Service.CreateReservationAsync(new("system", null, phones[0].Id, ReservationSystem.Other, test.Clock.Now.AddHours(1), null), default);
-        await test.Service.CreateReservationAsync(new("system", null, phones[1].Id, ReservationSystem.Other, null, null), default);
+        await test.Service.CreateReservationAsync(new() { ReservedFor = "system", PhoneNumberId = phones[0].Id, System = ReservationSystem.Other, Expires = test.Clock.Now.AddHours(1) }, default);
+        await test.Service.CreateReservationAsync(new() { ReservedFor = "system", PhoneNumberId = phones[1].Id, System = ReservationSystem.Other }, default);
         test.Clock.Now = test.Clock.Now.AddHours(2);
         await new ReconciliationService(new EfRegistryStore(test.Db), new FakeTeams(), test.Clock).CleanupAsync(default);
         Assert.Equal(PhoneStatus.Available, (await test.Service.PhoneAsync(phones[0].Id, default)).Status);
@@ -154,8 +154,8 @@ public sealed class RegistryTests
         using var test = new TestDatabase();
         await test.Service.CreateRangeAsync(Input(), default);
         var phone = await test.Db.PhoneNumbers.FirstAsync();
-        test.Db.Reservations.Add(new(phone.Id, "system", null, ReservationSystem.Other, null, null, test.Clock.Now));
-        test.Db.Reservations.Add(new(phone.Id, "external", null, ReservationSystem.Other, null, null, test.Clock.Now));
+        test.Db.Reservations.Add(new(phone.Id, new ReservationDetails { ReservedFor = "system", System = ReservationSystem.Other }, test.Clock.Now));
+        test.Db.Reservations.Add(new(phone.Id, new ReservationDetails { ReservedFor = "external", System = ReservationSystem.Other }, test.Clock.Now));
         await Assert.ThrowsAsync<DbUpdateException>(() => test.Db.SaveChangesAsync());
     }
 }

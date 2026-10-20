@@ -4,7 +4,10 @@ using PhoneNumbersManagement.Infrastructure;
 
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddRegistry(builder.Configuration).AddTeamsSynchronization();
-var connection = builder.Configuration.GetConnectionString("Hangfire") ?? builder.Configuration.GetConnectionString("Registry")!;
+var configuredHangfire = builder.Configuration.GetConnectionString("Hangfire");
+var connection = string.IsNullOrWhiteSpace(configuredHangfire)
+    ? builder.Configuration.GetConnectionString("Registry")!
+    : configuredHangfire;
 builder.Services.AddHangfire(configuration => configuration
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
     .UseSimpleAssemblyNameTypeSerializer().UseRecommendedSerializerSettings()

@@ -4,57 +4,82 @@ namespace PhoneNumbersManagement.Application;
 
 public sealed class ReconciliationService(IRegistryStore store, ITeamsDirectory teams, TimeProvider clock)
 {
+    private const int BatchSize = 500;
+    private static readonly TimeSpan ObservationReuseWindow = TimeSpan.FromSeconds(30);
+
     public async Task SynchronizeAsync(CancellationToken ct)
     {
-        // Fetch all pages before making changes. An incomplete external snapshot must never release numbers.
-        var assignments = await teams.GetAssignmentsAsync(ct);
-        foreach (var assignment in assignments)
+        // Fully retrieve and validate the external scan before changing local assignments.
+        var snapshot = await teams.GetAssignmentsAsync(ct);
+        var assignments = ValidateAssignments(snapshot);
+        var observations = new Dictionary<Guid, (DirectoryUserState State, DateTimeOffset ObservedAt)>();
+
+        async Task<DirectoryUserState> UserStateAsync(Guid id, CancellationToken token)
         {
-            E164.Validate(assignment.Number);
-            if (assignment.UserId == Guid.Empty)
+            if (observations.TryGetValue(id, out var observation))
             {
-                throw new RuleViolation("Teams returned an invalid object ID.");
+                var age = clock.GetUtcNow() - observation.ObservedAt;
+                if (age >= TimeSpan.Zero && age < ObservationReuseWindow)
+                {
+                    return observation.State;
+                }
+            }
+
+            var state = await teams.GetUserStateAsync(id, token);
+            observations[id] = (state, clock.GetUtcNow());
+            return state;
+        }
+
+        foreach (var batch in assignments.Chunk(BatchSize))
+        {
+            var managed = await store.ManagedPhonesAsync(batch.Select(x => x.Number).ToArray(), ct);
+            foreach (var assignment in batch)
+            {
+                // Do not perform directory lookups or open write transactions for unmanaged numbers.
+                if (!managed.TryGetValue(assignment.Number, out var phoneState))
+                {
+                    continue;
+                }
+
+                if (await UserStateAsync(assignment.UserId, ct) == DirectoryUserState.Missing)
+                {
+                    continue;
+                }
+
+                if (phoneState.MatchesAssignment(assignment.UserId))
+                {
+                    continue;
+                }
+
+                await store.WriteAsync(async token =>
+                {
+                    // Always reload inside the transaction; a batch projection is not a write authority.
+                    var phone = await store.FindPhoneByNumberAsync(assignment.Number, token);
+                    if (phone is null)
+                    {
+                        return false;
+                    }
+
+                    var hold = await store.ReservationForPhoneAsync(phone.Id, token);
+                    if (hold is not null)
+                    {
+                        store.Remove(hold);
+                    }
+
+                    phone.Assign(assignment.UserId);
+                    return true;
+                }, ct);
             }
         }
 
-        if (assignments.GroupBy(x => x.Number).Any(g => g.Select(x => x.UserId).Distinct().Count() > 1))
+        // Scan only assigned numbers, with a stable numeric cursor rather than growing OFFSETs.
+        long cursor = 0;
+        while (true)
         {
-            throw new Conflict("Teams returned multiple owners for the same number.");
-        }
-
-        foreach (var assignment in assignments)
-        {
-            if (await teams.GetUserStateAsync(assignment.UserId, ct) == DirectoryUserState.Missing)
+            var page = await store.AssignedPhonesAfterAsync(cursor, BatchSize, ct);
+            foreach (var candidate in page)
             {
-                continue;
-            }
-
-            await store.WriteAsync(async token =>
-            {
-                var phone = await store.FindPhoneByNumberAsync(assignment.Number, token);
-                if (phone is null)
-                {
-                    return false; // Only managed ranges are synchronized.
-                }
-
-                var hold = await store.ReservationForPhoneAsync(phone.Id, token);
-                if (hold is not null)
-                {
-                    store.Remove(hold); // Authoritative assignment consumes the reservation.
-                }
-
-                phone.Assign(assignment.UserId);
-                return true;
-            }, ct);
-        }
-
-        for (var offset = 0; ; offset += 1000)
-        {
-            var page = await store.PhonesAsync(new PhoneQuery(Offset: offset, Limit: 1000), ct);
-            foreach (var candidate in page.Items.Where(x => x.AssignedUser is not null))
-            {
-                var userId = candidate.AssignedUser!.Value;
-                if (await teams.GetUserStateAsync(userId, ct) != DirectoryUserState.Missing)
+                if (await UserStateAsync(candidate.UserId, ct) != DirectoryUserState.Missing)
                 {
                     continue;
                 }
@@ -62,7 +87,7 @@ public sealed class ReconciliationService(IRegistryStore store, ITeamsDirectory 
                 await store.WriteAsync(async token =>
                 {
                     var phone = await store.FindPhoneAsync(candidate.Id, token);
-                    if (phone is null || phone.AssignedUser != userId)
+                    if (phone is null || phone.AssignedUser != candidate.UserId)
                     {
                         return false;
                     }
@@ -70,7 +95,7 @@ public sealed class ReconciliationService(IRegistryStore store, ITeamsDirectory 
                     var hold = await store.ReservationForPhoneAsync(phone.Id, token);
                     if (hold?.Kind == ReservationKind.Offboarding)
                     {
-                        return false; // Never reset the timer on retries.
+                        return false;
                     }
 
                     if (hold is not null)
@@ -78,19 +103,49 @@ public sealed class ReconciliationService(IRegistryStore store, ITeamsDirectory 
                         throw new Conflict("Unexpected reservation on assigned phone number.");
                     }
 
-                    var until = clock.GetUtcNow().AddDays(30);
+                    var now = clock.GetUtcNow();
+                    var until = now.AddDays(30);
                     phone.StartOffboarding(until);
-                    store.Add(new Reservation(phone.Id, "system", "Offboarding quarantine", ReservationSystem.MicrosoftTeams,
-                        until, null, clock.GetUtcNow(), ReservationKind.Offboarding));
+                    store.Add(new Reservation(phone.Id, new ReservationDetails
+                    {
+                        ReservedFor = "system",
+                        Reason = "Offboarding quarantine",
+                        System = ReservationSystem.MicrosoftTeams,
+                        Expires = until
+                    }, now, ReservationKind.Offboarding));
                     return true;
                 }, ct);
             }
 
-            if (page.Items.Count < 1000)
+            if (page.Count < BatchSize)
             {
                 break;
             }
+
+            cursor = page[^1].NumericValue;
         }
+    }
+
+    private static IReadOnlyCollection<TeamsAssignment> ValidateAssignments(IReadOnlyList<TeamsAssignment> snapshot)
+    {
+        var unique = new Dictionary<string, TeamsAssignment>(snapshot.Count, StringComparer.Ordinal);
+        foreach (var assignment in snapshot)
+        {
+            E164.Validate(assignment.Number);
+            if (assignment.UserId == Guid.Empty)
+            {
+                throw new RuleViolation("Teams returned an invalid object ID.");
+            }
+
+            if (unique.TryGetValue(assignment.Number, out var existing) && existing.UserId != assignment.UserId)
+            {
+                throw new Conflict("Teams returned multiple owners for the same number.");
+            }
+
+            unique[assignment.Number] = assignment;
+        }
+
+        return unique.Values;
     }
 
     public async Task CleanupAsync(CancellationToken ct)
