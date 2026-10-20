@@ -1,3 +1,6 @@
 namespace PhoneNumbersManagement.Domain;
 
-public enum ReservationKind { Standard, Offboarding }
+public enum ReservationKind
+{
+    Standard, Offboarding
+}

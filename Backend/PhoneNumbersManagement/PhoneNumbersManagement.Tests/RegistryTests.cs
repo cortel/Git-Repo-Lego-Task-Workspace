@@ -2,18 +2,21 @@ using Microsoft.EntityFrameworkCore;
 using PhoneNumbersManagement.Application;
 using PhoneNumbersManagement.Domain;
 using PhoneNumbersManagement.Infrastructure;
+
 namespace PhoneNumbersManagement.Tests;
 
 public sealed class RegistryTests
 {
     internal static RangeInput Input(string start = "+4512345600", string end = "+4512345602") =>
         new("Aarhus", null, start, end, null, true, "Provider", RangeType.DirectRouting, "sbc.example", "site-1");
+
     [Theory]
     [InlineData("4512345678")]
     [InlineData("+012345")]
     [InlineData("+45 12345678")]
     [InlineData("+1234567890123456")]
     public void RejectsInvalidE164(string number) => Assert.Throws<RuleViolation>(() => E164.Validate(number));
+
     [Fact]
     public async Task RangeCreatesInclusiveNumbersAndCascadesReservations()
     {
@@ -22,12 +25,14 @@ public sealed class RegistryTests
         var numbers = await test.Service.NextAvailableAsync(range.Id, 10, default);
         Assert.Equal(new[] { "+4512345600", "+4512345601", "+4512345602" }, numbers.Select(x => x.LineUri));
         await test.Service.CreateReservationAsync(new("system", null, numbers[0].Id, ReservationSystem.Other, null, null), default);
+
         // Clear tracking so this verifies database cascading, rather than EF's in-memory relationship fixup.
         test.Db.ChangeTracker.Clear();
         await test.Service.DeleteRangeAsync(range.Id, default);
         Assert.Empty(await test.Db.PhoneNumbers.ToListAsync());
         Assert.Empty(await test.Db.Reservations.ToListAsync());
     }
+
     [Fact]
     public async Task DoubleReservationFailsWithoutChangingFirstReservation()
     {
@@ -41,6 +46,7 @@ public sealed class RegistryTests
         Assert.Equal(first.Id, (await test.Db.Reservations.SingleAsync()).Id);
         Assert.Equal(PhoneStatus.Reserved, (await test.Service.PhoneAsync(phone.Id, default)).Status);
     }
+
     [Fact]
     public async Task OverlappingRangeIsRejectedAtomically()
     {
@@ -50,14 +56,19 @@ public sealed class RegistryTests
         Assert.Equal(3, await test.Db.PhoneNumbers.CountAsync());
         Assert.Equal(1, await test.Db.Ranges.CountAsync());
     }
+
     [Fact]
     public async Task InactiveRangeCannotBeReserved()
     {
         using var test = new TestDatabase();
-        var range = await test.Service.CreateRangeAsync(Input() with { Active = false }, default);
+        var range = await test.Service.CreateRangeAsync(Input() with
+        {
+            Active = false
+        }, default);
         var phone = await test.Db.PhoneNumbers.FirstAsync();
         await Assert.ThrowsAsync<Conflict>(() => test.Service.CreateReservationAsync(new("system", null, phone.Id, ReservationSystem.Other, null, null), default));
     }
+
     [Fact]
     public async Task ExpiryReleasesNumberButNeverExpiresPermanentReservation()
     {
@@ -72,6 +83,7 @@ public sealed class RegistryTests
         Assert.Equal(PhoneStatus.Reserved, (await test.Service.PhoneAsync(phones[1].Id, default)).Status);
         Assert.Single(await test.Db.Reservations.ToListAsync());
     }
+
     [Fact]
     public async Task OffboardingIsIdempotentAndReleasesOnlyAfterThirtyDays()
     {
@@ -94,8 +106,10 @@ public sealed class RegistryTests
         test.Clock.Now = test.Clock.Now.AddDays(30);
         await jobs.CleanupAsync(default);
         var released = await test.Service.PhoneAsync(phone.Id, default);
-        Assert.Null(released.AssignedUser); Assert.Equal(PhoneStatus.Available, released.Status);
+        Assert.Null(released.AssignedUser);
+        Assert.Equal(PhoneStatus.Available, released.Status);
     }
+
     [Fact]
     public async Task ReturnedUserCancelsOffboardingAndGraphFailuresDoNotRelease()
     {
@@ -112,22 +126,28 @@ public sealed class RegistryTests
         teams.Fail = true;
         await Assert.ThrowsAsync<HttpRequestException>(() => jobs.CleanupAsync(default));
         Assert.Equal(user, (await test.Service.PhoneAsync(phone.Id, default)).AssignedUser);
-        teams.Fail = false; teams.State = DirectoryUserState.Exists;
+        teams.Fail = false;
+        teams.State = DirectoryUserState.Exists;
         await jobs.SynchronizeAsync(default);
         Assert.Empty(await test.Db.Reservations.ToListAsync());
         Assert.Null((await test.Service.PhoneAsync(phone.Id, default)).ScheduledUnassignment);
         Assert.Equal(PhoneStatus.InUse, (await test.Service.PhoneAsync(phone.Id, default)).Status);
     }
+
     [Fact]
     public async Task PatchCannotOverwriteAnInterveningUpdate()
     {
         using var test = new TestDatabase();
         var range = await test.Service.CreateRangeAsync(Input(), default);
         var version = range.Version;
-        await test.Service.UpdateRangeAsync(range.Id, Input() with { Name = "Updated" }, default);
+        await test.Service.UpdateRangeAsync(range.Id, Input() with
+        {
+            Name = "Updated"
+        }, default);
         await Assert.ThrowsAsync<Conflict>(() => test.Service.UpdateRangeAsync(range.Id, Input(), default, version));
         Assert.Equal("Updated", (await test.Service.RangeAsync(range.Id, default)).Name);
     }
+
     [Fact]
     public async Task DatabaseEnforcesOneReservationPerNumber()
     {

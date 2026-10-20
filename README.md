@@ -92,3 +92,19 @@ dotnet ef migrations has-pending-model-changes --project Backend/PhoneNumbersMan
 Splitting classes into separate files does not change their model identities or database tables. This refactor therefore needs no new migration.
 
 Reference: https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/
+
+## Code formatting and readability
+
+Repository `.editorconfig` supplies Visual Studio and .NET formatting conventions: four-space indentation, consistent spaces around operators and parameters, braces on separate lines, and expanded multi-statement blocks. A focused StyleCop.Analyzers development dependency adds blank-line checks between members, after blocks, and around comments, while rejecting excessive blank lines. It is private to development/build tooling; it adds no application runtime library. The pinned 1.2.0-beta.556 analyzer release supports modern C# constructs. Unrelated documentation, naming, and ordering rules are disabled to keep feedback focused.
+
+Keep one blank line between properties, constructors, and methods. Group related statements into short paragraphs and use one executable statement per line. Keep auto-properties compact; expand method/control-flow bodies. Generated EF migration files are excluded from formatting changes.
+
+In Visual Studio, use **Ctrl+K, Ctrl+D** to format a document. Layout analyzer suggestions appear in the editor; use **Ctrl+.** to apply applicable fixes. To format the solution from the repository root:
+
+```powershell
+dotnet format whitespace Backend/PhoneNumbersManagement/PhoneNumbersManagement.slnx --no-restore
+dotnet format style Backend/PhoneNumbersManagement/PhoneNumbersManagement.slnx --no-restore --diagnostics IDE0011 --severity warn
+dotnet format analyzers Backend/PhoneNumbersManagement/PhoneNumbersManagement.slnx --no-restore --diagnostics SA1500 SA1502 SA1503 SA1505 SA1507 SA1513 SA1515 SA1516 --severity warn
+```
+
+Use the same commands with `--verify-no-changes` to check formatting without modifying source. Layout rules are preferences for this repository, not universal requirements of C# or DDD.

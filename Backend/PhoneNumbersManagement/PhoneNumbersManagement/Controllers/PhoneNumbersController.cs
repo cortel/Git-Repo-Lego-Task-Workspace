@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PhoneNumbersManagement.Application;
 using PhoneNumbersManagement.Domain;
+
 namespace PhoneNumbersManagement.Controllers;
 
 [ApiController, Route("v1/phonenumbers")]
@@ -10,12 +11,16 @@ public sealed class PhoneNumbersController(RegistryService service) : Controller
 {
     [HttpGet, Authorize(Policy = "read")]
     public Task<Page<PhoneNumber>> GetAll([FromQuery] PhoneQuery query, CancellationToken ct) => service.PhonesAsync(query, ct);
+
     [HttpGet("{id:guid}"), Authorize(Policy = "read")]
     public Task<PhoneNumber> GetById(Guid id, CancellationToken ct) => service.PhoneAsync(id, ct);
+
     [HttpGet("getnextavailable"), Authorize(Policy = "read")]
     public Task<IReadOnlyList<PhoneNumber>> NextAvailable([FromQuery] Guid rangeId, [FromQuery] int amount, CancellationToken ct) => service.NextAvailableAsync(rangeId, amount, ct);
+
     [HttpPut("{id:guid}"), Authorize(Policy = "write")]
     public Task<PhoneNumber> Update(Guid id, PhoneInput input, CancellationToken ct) => service.UpdatePhoneAsync(id, input, ct);
+
     [HttpPatch("{id:guid}"), Authorize(Policy = "write")]
     public async Task<PhoneNumber> Patch(Guid id, JsonElement patch, CancellationToken ct)
     {

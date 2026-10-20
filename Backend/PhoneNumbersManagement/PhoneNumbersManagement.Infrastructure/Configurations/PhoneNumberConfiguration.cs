@@ -8,7 +8,8 @@ public sealed class PhoneNumberConfiguration : IEntityTypeConfiguration<PhoneNum
 {
     public void Configure(EntityTypeBuilder<PhoneNumber> builder)
     {
-        builder.ToTable("PhoneNumbers"); builder.HasKey(x => x.Id);
+        builder.ToTable("PhoneNumbers");
+        builder.HasKey(x => x.Id);
         builder.Property(x => x.Version).IsConcurrencyToken();
         builder.Property(x => x.LineUri).HasMaxLength(16).IsRequired();
         builder.Property(x => x.Status).HasConversion<string>().HasMaxLength(20);

@@ -1,0 +1,58 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.md]
+trim_trailing_whitespace = false
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.cs]
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_between_query_expression_clauses = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_comma = true
+csharp_space_after_semicolon_in_for_statement = true
+csharp_space_around_binary_operators = before_and_after
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_space_between_method_call_parameter_list_parentheses = false
+csharp_space_between_method_declaration_parameter_list_parentheses = false
+csharp_preserve_single_line_blocks = true
+csharp_preserve_single_line_statements = false
+csharp_prefer_braces = true:warning
+dotnet_diagnostic.IDE0055.severity = warning
+
+# Enable only the StyleCop layout rules relevant to readability.
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.DocumentationRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.LayoutRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.MaintainabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.NamingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.OrderingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.ReadabilityRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpacingRules.severity = none
+dotnet_analyzer_diagnostic.category-StyleCop.CSharp.SpecialRules.severity = none
+dotnet_diagnostic.SA0001.severity = none
+dotnet_diagnostic.SA1500.severity = warning
+dotnet_diagnostic.SA1502.severity = warning
+dotnet_diagnostic.SA1503.severity = warning
+dotnet_diagnostic.SA1505.severity = warning
+dotnet_diagnostic.SA1507.severity = warning
+dotnet_diagnostic.SA1513.severity = warning
+dotnet_diagnostic.SA1515.severity = warning
+dotnet_diagnostic.SA1516.severity = warning
+
+# EF owns generated migration source; keep its layout untouched.
+[**/Migrations/*.cs]
+generated_code = true

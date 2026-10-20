@@ -14,21 +14,26 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using PhoneNumbersManagement.Infrastructure;
+
 namespace PhoneNumbersManagement.Tests;
 
 public sealed class ApiTests
 {
     private static readonly JsonSerializerOptions ApiJson = new(JsonSerializerDefaults.Web) { Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() } };
+
     [Fact]
     public async Task OpenApiIs31AndShowsRoles()
     {
-        using var factory = new ApiFactory(); using var client = factory.Client();
+        using var factory = new ApiFactory();
+        using var client = factory.Client();
         var json = await client.GetStringAsync("/openapi/v1.json");
         using var doc = JsonDocument.Parse(json);
         Assert.StartsWith("3.1", doc.RootElement.GetProperty("openapi").GetString());
-        Assert.Contains("admin", json); Assert.Contains("/v1/reservations", json);
+        Assert.Contains("admin", json);
+        Assert.Contains("/v1/reservations", json);
         Assert.Equal("bearer", doc.RootElement.GetProperty("components").GetProperty("securitySchemes").GetProperty("Bearer").GetProperty("scheme").GetString());
     }
+
     [Theory]
     [InlineData(null, HttpStatusCode.Unauthorized)]
     [InlineData("read", HttpStatusCode.Forbidden)]
@@ -36,29 +41,43 @@ public sealed class ApiTests
     [InlineData("admin", HttpStatusCode.Created)]
     public async Task RangeCreationRequiresAdmin(string? role, HttpStatusCode status)
     {
-        using var factory = new ApiFactory(); using var client = factory.Client(role);
+        using var factory = new ApiFactory();
+        using var client = factory.Client(role);
         using var response = await client.PostAsJsonAsync("/v1/ranges", RegistryTests.Input(), ApiJson);
         Assert.Equal(status, response.StatusCode);
     }
+
     [Fact]
     public async Task PatchCanClearNullableFieldAndReportsValidationErrors()
     {
-        using var factory = new ApiFactory(); using var client = factory.Client("admin");
-        using var create = await client.PostAsJsonAsync("/v1/ranges", RegistryTests.Input() with { Description = "To clear" }, ApiJson);
+        using var factory = new ApiFactory();
+        using var client = factory.Client("admin");
+        using var create = await client.PostAsJsonAsync("/v1/ranges", RegistryTests.Input() with
+        {
+            Description = "To clear"
+        }, ApiJson);
         create.EnsureSuccessStatusCode();
         using var body = JsonDocument.Parse(await create.Content.ReadAsStringAsync());
         var id = body.RootElement.GetProperty("id").GetGuid();
-        using var patch = await client.PatchAsJsonAsync($"/v1/ranges/{id}", new { description = (string?)null });
+        using var patch = await client.PatchAsJsonAsync($"/v1/ranges/{id}", new
+        {
+            description = (string?)null
+        });
         patch.EnsureSuccessStatusCode();
         using var updated = JsonDocument.Parse(await patch.Content.ReadAsStringAsync());
         Assert.Equal(JsonValueKind.Null, updated.RootElement.GetProperty("description").ValueKind);
-        using var invalid = await client.PatchAsJsonAsync($"/v1/ranges/{id}", new { name = (string?)null });
+        using var invalid = await client.PatchAsJsonAsync($"/v1/ranges/{id}", new
+        {
+            name = (string?)null
+        });
         Assert.Equal(HttpStatusCode.BadRequest, invalid.StatusCode);
     }
 }
+
 internal sealed class ApiFactory : WebApplicationFactory<Program>
 {
     private readonly TestDatabase database = new();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Entra:TenantId", "11111111-1111-1111-1111-111111111111");
@@ -73,20 +92,41 @@ internal sealed class ApiFactory : WebApplicationFactory<Program>
             services.AddAuthentication("Test").AddScheme<AuthenticationSchemeOptions, TestAuthenticationHandler>("Test", _ => { });
         });
     }
+
     public HttpClient Client(string? role = null)
     {
-        var client = CreateClient(new() { BaseAddress = new Uri("https://localhost") });
-        if (role is not null) client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        var client = CreateClient(new()
+        {
+            BaseAddress = new Uri("https://localhost")
+        });
+        if (role is not null)
+        {
+            client.DefaultRequestHeaders.Add("X-Test-Role", role);
+        }
+
         return client;
     }
-    protected override void Dispose(bool disposing) { base.Dispose(disposing); if (disposing) database.Dispose(); }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+        {
+            database.Dispose();
+        }
+    }
 }
+
 internal sealed class TestAuthenticationHandler(IOptionsMonitor<AuthenticationSchemeOptions> options, ILoggerFactory logger, UrlEncoder encoder)
     : AuthenticationHandler<AuthenticationSchemeOptions>(options, logger, encoder)
 {
     protected override Task<AuthenticateResult> HandleAuthenticateAsync()
     {
-        if (!Request.Headers.TryGetValue("X-Test-Role", out var role)) return Task.FromResult(AuthenticateResult.NoResult());
+        if (!Request.Headers.TryGetValue("X-Test-Role", out var role))
+        {
+            return Task.FromResult(AuthenticateResult.NoResult());
+        }
+
         var identity = new ClaimsIdentity([new Claim(ClaimTypes.NameIdentifier, "test"), new Claim(ClaimTypes.Role, role.ToString())], Scheme.Name);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(new ClaimsPrincipal(identity), Scheme.Name)));
     }

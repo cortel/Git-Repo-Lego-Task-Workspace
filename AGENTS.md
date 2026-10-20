@@ -19,3 +19,7 @@ The user requests that repository changes made by the agent be committed and pus
 ## Source organization and schema changes
 
 Keep each production entity, class, interface, enum, and contract record in its own appropriately named file. Generated EF migration partial classes and the hosting Program entry point follow their tooling conventions. Keep domain entities independent of EF; put per-entity mappings in Infrastructure/Configurations. Use EF Core Code First: edit entities/mappings, generate and review the migration plus updated snapshot, then apply the migration through the appropriate environment's deployment process. Do not generate empty migrations for file-only refactors or manually edit snapshots as a routine workflow.
+
+## C# readability
+
+Follow the root .editorconfig and focused StyleCop layout diagnostics. Separate properties, constructors, and methods with a single blank line; group logical operations with blank lines, put executable statements on separate lines, and use braces for control flow. Preserve compact auto-properties and short expression-bodied members when readable. Run the documented format commands after C# edits. Leave generated EF migration layout to EF tooling. Formatting changes must preserve behavior and must not create schema migrations.

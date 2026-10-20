@@ -8,7 +8,8 @@ public sealed class NumberRangeConfiguration : IEntityTypeConfiguration<NumberRa
 {
     public void Configure(EntityTypeBuilder<NumberRange> builder)
     {
-        builder.ToTable("Ranges"); builder.HasKey(x => x.Id);
+        builder.ToTable("Ranges");
+        builder.HasKey(x => x.Id);
         builder.Property(x => x.Version).IsConcurrencyToken();
         builder.Property(x => x.Name).HasMaxLength(200).IsRequired();
         builder.Property(x => x.Description).HasMaxLength(2000);

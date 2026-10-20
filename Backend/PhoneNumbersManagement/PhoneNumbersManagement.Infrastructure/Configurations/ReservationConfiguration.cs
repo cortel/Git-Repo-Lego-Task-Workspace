@@ -8,7 +8,8 @@ public sealed class ReservationConfiguration : IEntityTypeConfiguration<Reservat
 {
     public void Configure(EntityTypeBuilder<Reservation> builder)
     {
-        builder.ToTable("Reservations"); builder.HasKey(x => x.Id);
+        builder.ToTable("Reservations");
+        builder.HasKey(x => x.Id);
         builder.Property(x => x.Version).IsConcurrencyToken();
         builder.Property(x => x.ReservedFor).HasMaxLength(20).IsRequired();
         builder.Property(x => x.Reason).HasMaxLength(2000);
