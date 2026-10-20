@@ -58,3 +58,37 @@ The two recurring jobs run in UTC: Teams synchronization every 15 minutes and re
 ## Current delivery limits
 
 The repository includes the initial PostgreSQL migration, API, jobs, Graph adapter, and automated tests. LEGO-specific catalogue registration, production provisioning, existing-data migration, and real-tenant integration testing remain environment-dependent. Range boundary editing, reservation history, and actual Teams unassignment require product decisions documented in the architecture.
+
+## Code First changes
+
+The C# entities and EF configuration classes define the database model. Each entity has its own file in Domain/Entities; each mapping has its own IEntityTypeConfiguration class in Infrastructure/Configurations. RegistryDbContext discovers these mappings automatically. Migrations and the model snapshot remain generated files in Infrastructure/Migrations.
+
+To change the schema:
+
+1. Edit the entity and its configuration as needed. Update request/response contracts and business rules if the feature requires it. A business-method-only change does not require a migration.
+2. From the repository root, generate a named migration:
+
+   ```powershell
+   dotnet ef migrations add DescribeYourChange --project Backend/PhoneNumbersManagement/PhoneNumbersManagement.Infrastructure
+   ```
+
+   EF compares the current configured model with the previous model snapshot, generates Up/Down operations and migration metadata, and updates the snapshot at this step. It does not compare against or change the live database here.
+3. Review the generated migration, especially renames, required columns on existing rows, and potential data loss. EF may need manual migration edits to represent a rename or data transformation correctly. Do not hand-edit the snapshot as the normal workflow.
+4. Apply the reviewed migration to your configured local database:
+
+   ```powershell
+   dotnet ef database update --project Backend/PhoneNumbersManagement/PhoneNumbersManagement.Infrastructure
+   ```
+
+   This applies pending migrations and records them in __EFMigrationsHistory. It does not generate a migration or update the source snapshot. Use the reviewed deployment process for shared/production databases.
+5. Build, test, and commit the entity/configuration changes together with the generated migration, metadata, and snapshot.
+
+To check whether the code model has changed without a migration:
+
+```powershell
+dotnet ef migrations has-pending-model-changes --project Backend/PhoneNumbersManagement/PhoneNumbersManagement.Infrastructure
+```
+
+Splitting classes into separate files does not change their model identities or database tables. This refactor therefore needs no new migration.
+
+Reference: https://learn.microsoft.com/en-us/ef/core/managing-schemas/migrations/

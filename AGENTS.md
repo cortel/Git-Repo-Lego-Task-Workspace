@@ -15,3 +15,7 @@ Scale this to the request: for a simple question or small edit, use a compact se
 ## Commit and push changes
 
 The user requests that repository changes made by the agent be committed and pushed to the current intended branch after appropriate verification. The working branch is currently `dev`; respect later branch instructions. Review the diff, commit only relevant changes, preserve unrelated user work, and push to the established origin. Do not force-push or overwrite remote history. Report the commit and push outcome, including any blocker.
+
+## Source organization and schema changes
+
+Keep each production entity, class, interface, enum, and contract record in its own appropriately named file. Generated EF migration partial classes and the hosting Program entry point follow their tooling conventions. Keep domain entities independent of EF; put per-entity mappings in Infrastructure/Configurations. Use EF Core Code First: edit entities/mappings, generate and review the migration plus updated snapshot, then apply the migration through the appropriate environment's deployment process. Do not generate empty migrations for file-only refactors or manually edit snapshots as a routine workflow.
