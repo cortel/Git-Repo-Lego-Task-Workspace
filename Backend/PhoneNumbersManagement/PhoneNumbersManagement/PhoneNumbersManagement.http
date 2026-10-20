@@ -1,6 +1,42 @@
-@PhoneNumbersManagement_HostAddress = http://localhost:5197
+@host = https://localhost:7185
+@token = REPLACE_WITH_ENTRA_ACCESS_TOKEN
+@rangeId = REPLACE_WITH_RANGE_ID
+@phoneId = REPLACE_WITH_PHONE_ID
 
-GET {{PhoneNumbersManagement_HostAddress}}/weatherforecast/
-Accept: application/json
+GET {{host}}/openapi/v1.json
 
-###
+### Create a range (admin); creates all three phone numbers in the same transaction.
+POST {{host}}/v1/ranges
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "Example range",
+  "description": null,
+  "rangeStart": "+4512345600",
+  "rangeEnd": "+4512345602",
+  "mainLine": null,
+  "active": true,
+  "provider": "Example provider",
+  "type": "DirectRouting",
+  "voiceRoute": "sbc.example.invalid",
+  "netboxSiteId": null
+}
+
+### Availability is a query; POST a reservation to claim a number.
+GET {{host}}/v1/phonenumbers/getnextavailable?rangeId={{rangeId}}&amount=2
+Authorization: Bearer {{token}}
+
+### Reserve an available number (write/admin).
+POST {{host}}/v1/reservations
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "reservedFor": "system",
+  "reason": "Capacity planning",
+  "phoneNumberId": "{{phoneId}}",
+  "system": "Other",
+  "expires": null,
+  "ticketNumber": "TASK-123"
+}

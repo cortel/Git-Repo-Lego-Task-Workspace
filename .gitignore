@@ -8,3 +8,11 @@
 # Per-user IDE settings
 *.user
 *.suo
+
+# Local secrets and test outputs
+.env
+.env.*
+!.env.example
+appsettings.Local.json
+TestResults/
+*.trx

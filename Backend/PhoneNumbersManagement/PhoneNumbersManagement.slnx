@@ -1,3 +1,8 @@
 <Solution>
+  <Project Path="PhoneNumbersManagement.Application/PhoneNumbersManagement.Application.csproj" />
+  <Project Path="PhoneNumbersManagement.Domain/PhoneNumbersManagement.Domain.csproj" />
+  <Project Path="PhoneNumbersManagement.Infrastructure/PhoneNumbersManagement.Infrastructure.csproj" />
+  <Project Path="PhoneNumbersManagement.Tests/PhoneNumbersManagement.Tests.csproj" />
+  <Project Path="PhoneNumbersManagement.Worker/PhoneNumbersManagement.Worker.csproj" />
   <Project Path="PhoneNumbersManagement/PhoneNumbersManagement.csproj" />
 </Solution>

@@ -7,7 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.13" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PhoneNumbersManagement.Application\PhoneNumbersManagement.Application.csproj" />
+    <ProjectReference Include="..\PhoneNumbersManagement.Infrastructure\PhoneNumbersManagement.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>
